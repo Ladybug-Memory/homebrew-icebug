@@ -11,44 +11,42 @@ class Icebug < Formula
   end
 
   depends_on "cmake" => :build
-  depends_on "cython" => :build
-  depends_on "ninja" => :build
-  depends_on "python-setuptools" => :build
-  depends_on "tlx" => :build
-
   depends_on "apache-arrow"
-  depends_on "numpy"
-  depends_on "python@3.14"
-  depends_on "scipy"
+  depends_on "tlx"
+  depends_on "ttmath"
 
   on_macos do
     depends_on "libomp"
   end
 
   def install
-    site_packages = Language::Python.site_packages(python3)
+    system "cmake", "-S", ".", "-B", "build",
+                    "-DNETWORKIT_EXT_TLX=#{formula_opt_prefix("tlx")}",
+                    "-DNETWORKIT_CXX_STANDARD=20",
+                    *std_cmake_args
+    system "cmake", "--build", "build"
+    system "cmake", "--install", "build"
 
-    ENV.prepend_create_path "PYTHONPATH", prefix/site_packages
-    ENV.append_path "PYTHONPATH", formula_opt_libexec("cython")/site_packages
-
-    networkit_site_packages = prefix/site_packages/"networkit"
-    extra_rpath = rpath(source: networkit_site_packages, target: formula_opt_lib("apache-arrow"))
-    system python3, "setup.py", "build_ext", "--external-tlx=#{formula_opt_prefix("tlx")}",
-                                             "--rpath=#{loader_path};#{extra_rpath}"
-
-    system python3, "-m", "pip", "install", *std_pip_args, "."
+    # `cmake --install` only ships *.hpp headers, so install the remaining
+    # *.tpp implementation files included by the public headers.
+    Dir["include/networkit/**/*.tpp"].each do |header|
+      (include/File.dirname(header.delete_prefix("include/"))).install header
+    end
   end
 
   test do
-    system python3, "-c", <<~PYTHON
-      import icebug as ib
-      G = ib.graph.Graph(3)
-      G.addEdge(0,1)
-      G.addEdge(1,2)
-      G.addEdge(2,0)
-      assert G.degree(0) == 2
-      assert G.degree(1) == 2
-      assert G.degree(2) == 2
-    PYTHON
+    (testpath/"test.cpp").write <<~CPP
+      #include <networkit/graph/Graph.hpp>
+      int main()
+      {
+        // Try to create a graph with five nodes
+        NetworKit::Graph g(5);
+        return 0;
+      }
+    CPP
+    flags = %W[-I#{formula_opt_include("apache-arrow")} -I#{formula_opt_include("tlx")}"]
+    flags << "-I#{formula_opt_include("libomp")}" if OS.mac?
+    system ENV.cxx, "-std=c++20", "test.cpp", "-L#{lib}", "-lnetworkit", "-o", "test", *flags
+    system "./test"
   end
 end
