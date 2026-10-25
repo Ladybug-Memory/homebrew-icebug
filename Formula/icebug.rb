@@ -1,8 +1,8 @@
 class Icebug < Formula
   desc "High-performance graph analytics backed by read-only memory"
   homepage "https://github.com/Ladybug-Memory/icebug"
-  url "https://github.com/Ladybug-Memory/icebug/archive/refs/tags/13.3.tar.gz"
-  sha256 "28acfdf7ae257d96fe30f6ea8f85db4b86b45d81281b3e8ccb7d321fe9f8457b"
+  url "https://github.com/Ladybug-Memory/icebug/archive/refs/tags/13.5.tar.gz"
+  sha256 "687888f1575d0cedb5ada74f31f667bd69b71a676fe53efcaf0cfd5f829de077"
   license "MIT"
 
   livecheck do
