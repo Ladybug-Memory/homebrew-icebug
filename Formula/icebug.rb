@@ -11,6 +11,7 @@ class Icebug < Formula
   end
 
   depends_on "cmake" => :build
+  depends_on "llvm" => :build
   depends_on "apache-arrow"
   depends_on "tlx"
   depends_on "ttmath"
@@ -20,10 +21,26 @@ class Icebug < Formula
   end
 
   def install
-    system "cmake", "-S", ".", "-B", "build",
-                    "-DNETWORKIT_EXT_TLX=#{formula_opt_prefix("tlx")}",
-                    "-DNETWORKIT_CXX_STANDARD=20",
-                    *std_cmake_args
+    # Build with Homebrew's LLVM clang rather than Xcode's AppleClang,
+    # so a plain Command Line Tools install is sufficient.
+    ENV["CC"] = Formula["llvm"].opt_bin/"clang"
+    ENV["CXX"] = Formula["llvm"].opt_bin/"clang++"
+
+    args = [
+      "-DNETWORKIT_EXT_TLX=#{formula_opt_prefix("tlx")}",
+      "-DNETWORKIT_CXX_STANDARD=20",
+    ]
+    # Upstream's CMake fallback only searches /usr for libomp when the
+    # compiler is brew clang, so point it at the libomp formula explicitly.
+    if OS.mac?
+      args += [
+        "-DOpenMP_CXX_FLAGS=-fopenmp -I#{formula_opt_include("libomp")}",
+        "-DOpenMP_CXX_LIB_NAMES=omp",
+        "-DOpenMP_omp_LIBRARY=#{formula_opt_lib("libomp")}/libomp.dylib",
+      ]
+    end
+
+    system "cmake", "-S", ".", "-B", "build", *args, *std_cmake_args
     system "cmake", "--build", "build"
     system "cmake", "--install", "build"
 
